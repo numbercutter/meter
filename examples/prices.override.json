@@ -1,0 +1,6 @@
+{
+  "models": {
+    "openai/sora-2": { "second": 0.3 },
+    "acme/upscaler-v2": { "image": 0.01 }
+  }
+}

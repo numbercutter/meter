@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="meter: Know what every output really cost.">
+  <rect width="1280" height="640" fill="#18181B"/>
+  <g transform="translate(120 224) scale(3)">
+    <path d="M14 0 H46 L64 18 V50 Q64 64 50 64 H14 Q0 64 0 50 V14 Q0 0 14 0 Z" fill="#18181B" stroke="#38383B" stroke-width="1.5"/>
+    <path d="M16.96 42.47 A16 16 0 1 1 47.04 42.47" fill="none" stroke="#EF4444" stroke-width="5" stroke-linecap="round"/><path d="M32 37 L39.71 27.81" stroke="#EF4444" stroke-width="4" stroke-linecap="round"/><circle cx="32" cy="37" r="4" fill="#EF4444"/>
+  </g>
+  <text x="384" y="318" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-weight="700" font-size="120" fill="#EF4444">meter</text>
+  <text x="388" y="386" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="34" fill="#979798">Know what every output really cost.</text>
+  <text x="1232" y="600" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#979798" fill-opacity="0.7">a numbercutter instrument</text>
+</svg>
