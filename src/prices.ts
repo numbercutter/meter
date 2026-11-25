@@ -5,6 +5,7 @@ export type Usage = {
   output_tokens?: number;
   cache_read_tokens?: number;
   cache_write_tokens?: number;
+  cache_write_1h_tokens?: number;
   images?: number;
   seconds?: number;
 };
@@ -14,6 +15,7 @@ export type Price = {
   output?: number;
   cache_read?: number;
   cache_write?: number;
+  cache_write_1h?: number;
   image?: number;
   second?: number;
   asOf?: string;
@@ -53,7 +55,18 @@ export function costOf(price: Price, u: Usage): number {
     ((u.output_tokens ?? 0) * (price.output ?? 0)) / m +
     ((u.cache_read_tokens ?? 0) * (price.cache_read ?? input * 0.1)) / m +
     ((u.cache_write_tokens ?? 0) * (price.cache_write ?? input * 1.25)) / m +
+    ((u.cache_write_1h_tokens ?? 0) * (price.cache_write_1h ?? input * 2)) / m +
     (u.images ?? 0) * (price.image ?? 0) +
     (u.seconds ?? 0) * (price.second ?? 0)
   );
+}
+
+export function cacheSavings(price: Price, u: Usage): number {
+  const m = 1_000_000;
+  const input = price.input ?? 0;
+  const saved = ((u.cache_read_tokens ?? 0) * (input - (price.cache_read ?? input * 0.1))) / m;
+  const premium =
+    ((u.cache_write_tokens ?? 0) * ((price.cache_write ?? input * 1.25) - input)) / m +
+    ((u.cache_write_1h_tokens ?? 0) * ((price.cache_write_1h ?? input * 2) - input)) / m;
+  return saved - premium;
 }

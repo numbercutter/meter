@@ -1,4 +1,4 @@
-import { costOf, findPrice, type PriceTable } from "./prices";
+import { cacheSavings, costOf, findPrice, type PriceTable } from "./prices";
 import type { CallEntry, Entry, KeepEntry } from "./meter";
 
 export type GroupBy = "tag" | "model" | "day";
@@ -12,6 +12,7 @@ export type Row = {
   cost_per_kept: number | null;
   wasted_share: number | null;
   unpriced: number;
+  cache_saved: number;
 };
 
 export type Report = {
@@ -34,6 +35,11 @@ export async function readLog(path: string): Promise<Entry[]> {
     }
   }
   return entries;
+}
+
+function savedBy(call: CallEntry, prices: PriceTable): number {
+  const found = findPrice(prices, call.provider, call.model);
+  return found ? cacheSavings(found.price, call.usage ?? {}) : 0;
 }
 
 function priced(call: CallEntry, prices: PriceTable): number | null {
@@ -65,6 +71,7 @@ export function buildReport(entries: Entry[], by: GroupBy, prices: PriceTable, f
     let spend = 0;
     let keptSpend = 0;
     let missing = 0;
+    let saved = 0;
     const kept = new Set<string>();
     for (const c of list) {
       const cost = priced(c, prices);
@@ -74,6 +81,7 @@ export function buildReport(entries: Entry[], by: GroupBy, prices: PriceTable, f
         continue;
       }
       spend += cost;
+      saved += savedBy(c, prices);
       if (isKept(c)) {
         keptSpend += cost;
         kept.add(`${c.tag}\u0000${c.output_id}`);
@@ -90,6 +98,7 @@ export function buildReport(entries: Entry[], by: GroupBy, prices: PriceTable, f
       cost_per_kept: keptN ? spend / keptN : null,
       wasted_share: linked && spend > 0 ? 1 - keptSpend / spend : null,
       unpriced: missing,
+      cache_saved: saved,
     };
   };
 
@@ -99,19 +108,25 @@ export function buildReport(entries: Entry[], by: GroupBy, prices: PriceTable, f
   return { by, rows, total: summarize("total", calls, totalKept), unpriced_models: [...unpriced].sort() };
 }
 
-function usd(v: number | null) {
+export function usd(v: number | null) {
   if (v === null) return "-";
   if (v === 0) return "$0";
   return v < 1 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
 }
 
-function pct(v: number | null) {
+export function signedUsd(v: number) {
+  if (Math.abs(v) < 0.00005) return "-";
+  return v < 0 ? `-${usd(-v)}` : usd(v);
+}
+
+export function pct(v: number | null) {
   return v === null ? "-" : `${Math.round(v * 100)}%`;
 }
 
 export function formatReport(r: Report): string {
-  const head = [r.by, "calls", "failed", "spend", "kept", "cost/kept", "wasted"];
-  const line = (x: Row) => [x.group, String(x.calls), String(x.failed), usd(x.spend), String(x.kept), usd(x.cost_per_kept), pct(x.wasted_share)];
+  const cache = Math.abs(r.total.cache_saved) > 0.00005;
+  const head = [r.by, "calls", "failed", "spend", "kept", "cost/kept", "wasted", ...(cache ? ["cache saved"] : [])];
+  const line = (x: Row) => [x.group, String(x.calls), String(x.failed), usd(x.spend), String(x.kept), usd(x.cost_per_kept), pct(x.wasted_share), ...(cache ? [signedUsd(x.cache_saved)] : [])];
   const body = r.rows.map(line);
   const total = line(r.total);
   const widths = head.map((h, i) => Math.max(h.length, ...body.map((b) => b[i].length), total[i].length));

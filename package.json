@@ -1,6 +1,6 @@
 {
   "name": "@numbercutter/meter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The real cost of every kept output from a generative pipeline.",
   "type": "module",
   "license": "MIT",
@@ -10,6 +10,7 @@
   "files": ["src", "prices.json", "assets", "README.md", "LICENSE"],
   "scripts": {
     "example": "bun examples/pipeline.ts",
+    "stream": "bun examples/stream.ts",
     "report": "bun src/cli.ts report"
   },
   "engines": { "bun": ">=1.1" },

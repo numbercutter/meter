@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { buildReport, createMeter, defaultPrices, formatReport, readLog } from "../src/index";
+import { BudgetError, buildReport, createMeter, defaultPrices, formatReport, readLog } from "../src/index";
 
 const log = fileURLToPath(new URL("./out/meter.jsonl", import.meta.url));
 rmSync(log, { force: true });
@@ -13,12 +13,14 @@ const rand = () => {
 const between = (a: number, b: number) => Math.round(a + rand() * (b - a));
 
 let clock = Date.parse("2026-11-20T09:00:00Z");
-const now = () => new Date((clock += between(20, 90) * 1000));
+const tick = () => (clock += between(20, 90) * 1000);
+const now = () => new Date(clock);
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+  tick();
   const url = String(input);
   const req = JSON.parse(String(init?.body ?? "{}"));
   if (url.includes("anthropic.com")) {
@@ -52,6 +54,11 @@ const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => 
 }) as typeof fetch;
 
 const meter = createMeter({ log, fetch: fakeFetch, now });
+
+const warnings: string[] = [];
+meter.budget({ tag: "product-shot", perDay: 0.5, onExceed: (b) => warnings.push(`${b.day} product-shot passed $${b.perDay} (warn only)`) });
+const teaserBudget = meter.budget({ tag: "teaser", perDay: 0.5, action: "throw", onExceed: (b) => warnings.push(`${b.day} teaser passed $${b.perDay}; later teasers that day are refused`) });
+let refused = 0;
 
 async function withRetries(attempts: number, call: () => Promise<Response>) {
   for (let i = 0; i < attempts; i++) {
@@ -97,13 +104,22 @@ for (let day = 0; day < 3; day++) {
   }
   for (let clip = 0; clip < 2; clip++) {
     const outputId = `teaser-${day}-${clip}`;
+    try {
+      teaserBudget.check();
+    } catch (e) {
+      if (!(e instanceof BudgetError)) throw e;
+      refused++;
+      continue;
+    }
+    tick();
     const ok = rand() > 0.15;
     meter.record({ provider: "openai", model: "sora-2", usage: { seconds: ok ? 8 : 0 }, tag: "teaser", ok, outputId, status: ok ? 200 : 500 });
     if (ok && rand() < 0.5) meter.keep("teaser", outputId);
   }
 }
 
-console.log(`Simulated 3 days: ${attemptsMade} product-shot attempts, ${shots} kept.\n`);
+console.log(`Simulated 3 days: ${attemptsMade} product-shot attempts, ${shots} kept, ${refused} teasers refused by budget.`);
+console.log(warnings.map((w) => `  budget: ${w}`).join("\n") + "\n");
 const entries = await readLog(log);
 const byTag = buildReport(entries, "tag", defaultPrices);
 console.log(formatReport(byTag));
@@ -112,3 +128,4 @@ console.log(`\nOne image lists at $${defaultPrices["openai/gpt-image-1"].image}.
 console.log(formatReport(buildReport(entries, "model", defaultPrices)));
 console.log(`\nLog written to ${log}`);
 console.log(`Try: bun src/cli.ts report --by day --log examples/out/meter.jsonl`);
+console.log(`     bun src/cli.ts report --log examples/out/meter.jsonl --html examples/out/report.html`);

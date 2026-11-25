@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
 import { defaultPrices, findPrice, loadPriceFile, mergePrices, pricesAsOf } from "./prices";
+import { renderHtml } from "./html";
 import { buildReport, formatReport, readLog, type GroupBy } from "./report";
 
 const usage = `meter: the real cost of every kept output.
 
   meter report [--by tag|model|day] [--log meter.jsonl] [--prices overrides.json]
-               [--since YYYY-MM-DD] [--tag name] [--json]
+               [--since YYYY-MM-DD] [--tag name] [--json] [--html out.html]
   meter prices [provider/model] [--prices overrides.json]
 
 The log defaults to $METER_LOG or ./meter.jsonl.`;
@@ -21,6 +22,7 @@ const { values, positionals } = parseArgs({
     since: { type: "string" },
     tag: { type: "string" },
     json: { type: "boolean", default: false },
+    html: { type: "string" },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -43,7 +45,20 @@ if (command === "report") {
   if (!["tag", "model", "day"].includes(by)) fail("--by must be tag, model or day");
   const log = values.log ?? process.env.METER_LOG ?? "meter.jsonl";
   const entries = await readLog(log).catch((e) => fail(e.message));
-  const report = buildReport(entries, by, prices, { since: values.since, tag: values.tag });
+  const filter = { since: values.since, tag: values.tag };
+  const report = buildReport(entries, by, prices, filter);
+  if (values.html) {
+    const html = renderHtml({
+      byDay: buildReport(entries, "day", prices, filter),
+      byTag: buildReport(entries, "tag", prices, filter),
+      byModel: buildReport(entries, "model", prices, filter),
+      pricesAsOf,
+      source: log,
+      generated: new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC",
+    });
+    await Bun.write(values.html, html);
+    console.error(`Wrote ${values.html}`);
+  }
   if (values.json) {
     console.log(JSON.stringify(report, null, 2));
   } else {
